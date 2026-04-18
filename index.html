@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Unstable Arena Tierlist</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: radial-gradient(circle at top, #111, #000);
+  color: white;
+}
+
+h1 {
+  text-align: center;
+  margin-top: 20px;
+  text-shadow: 0 0 15px cyan;
+}
+
+.credits {
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  margin: 10px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+}
+
+button {
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background: linear-gradient(90deg, #00ffd5, #0066ff);
+  color: white;
+  font-weight: bold;
+}
+
+button:hover {
+  transform: scale(1.05);
+}
+
+.board {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+}
+
+.tiers {
+  flex: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tier {
+  display: flex;
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 70px;
+  animation: fadeIn 0.3s ease;
+}
+
+.label {
+  width: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: black;
+}
+
+.items {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+}
+
+.item {
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.15);
+  cursor: grab;
+  transition: 0.2s;
+}
+
+.item:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 10px cyan;
+}
+
+.sidebar {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+}
+
+#pool {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.locked .item {
+  cursor: not-allowed;
+}
+
+@keyframes fadeIn {
+  from {opacity: 0; transform: translateY(10px);}
+  to {opacity: 1; transform: translateY(0);}
+}
+</style>
+</head>
+
+<body>
+
+<h1>⚔ Unstable Arena Tierlist ⚔</h1>
+<div class="credits">Created by ElioM09 / Eli0m</div>
+
+<div class="topbar">
+  <div id="mode">Mode: Viewer</div>
+  <div>
+    <button onclick="login()">Admin Login</button>
+    <button onclick="lock()">Lock</button>
+    <button onclick="addPlayer()">Add Player</button>
+  </div>
+</div>
+
+<div class="board">
+  <div class="tiers" id="tiers"></div>
+
+  <div class="sidebar">
+    <h3>UNRANKED PLAYERS</h3>
+    <div id="pool"></div>
+  </div>
+</div>
+
+<script>
+
+const tiers = [
+  "HT1","LT1",
+  "HT2","LT2",
+  "HT3","LT3",
+  "HT4","LT4",
+  "HT5","LT5"
+];
+
+let isAdmin = false;
+let players = JSON.parse(localStorage.getItem("players") || "[]");
+
+function updateUI() {
+  document.getElementById("mode").innerText =
+    "Mode: " + (isAdmin ? "ADMIN" : "Viewer");
+  document.body.className = isAdmin ? "" : "locked";
+}
+
+function savePlayers() {
+  localStorage.setItem("players", JSON.stringify(players));
+}
+
+function saveTiers() {
+  const data = {};
+  document.querySelectorAll(".items").forEach(t => {
+    data[t.dataset.tier] =
+      Array.from(t.children).map(i => i.textContent);
+  });
+  localStorage.setItem("tierData", JSON.stringify(data));
+}
+
+function loadTiers() {
+  return JSON.parse(localStorage.getItem("tierData") || "{}");
+}
+
+function createItem(text, id) {
+  const div = document.createElement("div");
+  div.className = "item";
+  div.textContent = text;
+  div.id = id || "id" + Math.random();
+
+  div.draggable = true;
+  div.ondragstart = e => {
+    if (!isAdmin) return;
+    e.dataTransfer.setData("text", div.id);
+  };
+
+  return div;
+}
+
+function render() {
+  const container = document.getElementById("tiers");
+  container.innerHTML = "";
+
+  const saved = loadTiers();
+
+  tiers.forEach((t, i) => {
+    const row = document.createElement("div");
+    row.className = "tier";
+
+    const label = document.createElement("div");
+    label.className = "label";
+    label.style.background = `hsl(${i * 30}, 80%, 60%)`;
+    label.textContent = t;
+
+    const items = document.createElement("div");
+    items.className = "items";
+    items.dataset.tier = t;
+
+    items.ondragover = e => e.preventDefault();
+    items.ondrop = e => {
+      if (!isAdmin) return;
+      const id = e.dataTransfer.getData("text");
+      items.appendChild(document.getElementById(id));
+      saveTiers();
+    };
+
+    (saved[t] || []).forEach(x => {
+      items.appendChild(createItem(x));
+    });
+
+    row.appendChild(label);
+    row.appendChild(items);
+    container.appendChild(row);
+  });
+
+  renderPool();
+}
+
+function renderPool() {
+  const pool = document.getElementById("pool");
+  pool.innerHTML = "";
+
+  players.forEach((p, i) => {
+    pool.appendChild(createItem(p, "p" + i));
+  });
+
+  pool.ondragover = e => e.preventDefault();
+  pool.ondrop = e => {
+    if (!isAdmin) return;
+    const id = e.dataTransfer.getData("text");
+    pool.appendChild(document.getElementById(id));
+    saveTiers();
+  };
+}
+
+function login() {
+  const pass = prompt("Admin Password:");
+  if (pass === "Elioisthebestownerever.") {
+    isAdmin = true;
+    updateUI();
+    alert("Admin enabled");
+  } else {
+    alert("Wrong password");
+  }
+}
+
+function lock() {
+  isAdmin = false;
+  updateUI();
+}
+
+function addPlayer() {
+  if (!isAdmin) return alert("Admin only");
+  const name = prompt("Enter player name:");
+  if (name) {
+    players.push(name);
+    savePlayers();
+    render();
+  }
+}
+
+updateUI();
+render();
+
+</script>
+
+</body>
+</html>
